@@ -142,6 +142,7 @@ export type Database = {
           website: string | null
           description: string | null
           category: string | null
+          category_other: string | null
           location: string | null
           logo_url: string | null
           status: Database["public"]["Enums"]["business_status"]
@@ -164,6 +165,7 @@ export type Database = {
           website?: string | null
           description?: string | null
           category?: string | null
+          category_other?: string | null
           location?: string | null
           logo_url?: string | null
           status?: Database["public"]["Enums"]["business_status"]
@@ -186,6 +188,7 @@ export type Database = {
           website?: string | null
           description?: string | null
           category?: string | null
+          category_other?: string | null
           location?: string | null
           logo_url?: string | null
           status?: Database["public"]["Enums"]["business_status"]

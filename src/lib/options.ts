@@ -30,6 +30,29 @@ export const LOCATIONS = [
 
 export type Location = (typeof LOCATIONS)[number];
 
+/**
+ * Business categories, per client spec (Aug 2026). These are the trades a
+ * partner business belongs to — distinct from `perk_categories` in the
+ * database, which categorises the individual offers. The two lists are kept
+ * deliberately identical so a business and its offer never file under
+ * different names; the DB seed lives in the matching migration.
+ */
+export const BUSINESS_CATEGORIES = [
+  "MOT & Services",
+  "Car Repair",
+  "Tyres",
+  "Car Wash",
+  "Car Sales Garages",
+  "Barbers",
+  "Beauty, Nail & Hair Salons",
+  "Gyms",
+  "Food & Drink",
+  "Mobile Phone Shops",
+  "Other",
+] as const;
+
+export type BusinessCategory = (typeof BUSINESS_CATEGORIES)[number];
+
 export const OTHER_VALUE = "Other";
 
 /**
@@ -51,4 +74,13 @@ export function displayLocation(
   if (!loc) return "—";
   if (loc === OTHER_VALUE && other) return `Other — ${other}`;
   return loc;
+}
+
+export function displayBusinessCategory(
+  category: string | null | undefined,
+  other: string | null | undefined,
+) {
+  if (!category) return "—";
+  if (category === OTHER_VALUE && other) return `Other — ${other}`;
+  return category;
 }

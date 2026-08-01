@@ -148,7 +148,7 @@ export default function AdminNewDriverPage() {
         className="max-w-xl mx-auto space-y-6"
       >
         <Link
-          href="/admin"
+          href="/admin/drivers"
           className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="size-4" /> Back to dashboard
@@ -197,7 +197,7 @@ export default function AdminNewDriverPage() {
               variant="outline_glow"
               size="lg"
               className="flex-1"
-              onClick={() => router.push("/admin")}
+              onClick={() => router.push("/admin/drivers")}
             >
               Back to dashboard
             </Button>
@@ -210,7 +210,7 @@ export default function AdminNewDriverPage() {
   return (
     <div className="max-w-xl mx-auto space-y-6">
       <Link
-        href="/admin"
+        href="/admin/drivers"
         className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="size-4" /> Back to dashboard

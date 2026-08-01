@@ -5,29 +5,31 @@ import Link from "next/link";
 import { z } from "zod";
 import { PublicShell, PageHeader } from "@/components/PublicShell";
 import { applyToPartner } from "@/integrations/supabase/partner-actions";
+import { BUSINESS_CATEGORIES, OTHER_VALUE } from "@/lib/options";
 import { toast } from "sonner";
 import { Loader2, CheckCircle2, ArrowRight } from "lucide-react";
 
-const schema = z.object({
-  business_name: z.string().min(2, "Business name is required"),
-  contact_name: z.string().min(2, "Your name is required"),
-  contact_email: z.string().email("Enter a valid email"),
-  contact_phone: z.string().optional().or(z.literal("")),
-  website: z.string().optional().or(z.literal("")),
-  category: z.string().optional().or(z.literal("")),
-  location: z.string().optional().or(z.literal("")),
-  description: z.string().max(600).optional().or(z.literal("")),
-});
-
-const CATEGORIES = [
-  "Fuel & EV Charging", "Tyres & Maintenance", "Insurance", "Food & Drink",
-  "Vehicle Accessories", "Business Services", "Other",
-];
+const schema = z
+  .object({
+    business_name: z.string().min(2, "Business name is required"),
+    contact_name: z.string().min(2, "Your name is required"),
+    contact_email: z.string().email("Enter a valid email"),
+    contact_phone: z.string().optional().or(z.literal("")),
+    website: z.string().optional().or(z.literal("")),
+    category: z.string().optional().or(z.literal("")),
+    category_other: z.string().max(80).optional().or(z.literal("")),
+    location: z.string().optional().or(z.literal("")),
+    description: z.string().max(600).optional().or(z.literal("")),
+  })
+  .refine((v) => v.category !== OTHER_VALUE || !!v.category_other?.trim(), {
+    message: "Tell us what type of business you are",
+    path: ["category_other"],
+  });
 
 export default function PartnerApply() {
   const [form, setForm] = useState({
     business_name: "", contact_name: "", contact_email: "", contact_phone: "",
-    website: "", category: "", location: "", description: "",
+    website: "", category: "", category_other: "", location: "", description: "",
   });
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
@@ -95,10 +97,31 @@ export default function PartnerApply() {
               <input value={form.website} onChange={upd("website")} className={inputCls} placeholder="https://" />
             </Row>
             <Row label="Category">
-              <select value={form.category} onChange={upd("category")} className={inputCls}>
+              <select
+                value={form.category}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    category: e.target.value,
+                    // Drop the free text if they move off "Other".
+                    category_other: e.target.value === OTHER_VALUE ? f.category_other : "",
+                  }))
+                }
+                className={inputCls}
+              >
                 <option value="">— select —</option>
-                {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                {BUSINESS_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
+              {form.category === OTHER_VALUE && (
+                <input
+                  value={form.category_other}
+                  onChange={upd("category_other")}
+                  className={`${inputCls} mt-2`}
+                  placeholder="What type of business are you?"
+                  maxLength={80}
+                  autoFocus
+                />
+              )}
             </Row>
             <Row label="Location">
               <input value={form.location} onChange={upd("location")} className={inputCls} placeholder="e.g. Newcastle" />

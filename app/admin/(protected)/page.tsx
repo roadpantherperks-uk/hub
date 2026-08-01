@@ -5,363 +5,166 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
-  Users,
-  Clock,
-  CheckCircle2,
-  XCircle,
-  Eye,
-  Loader2,
-  Plus,
-  Building2,
+  Users, UserPlus, CheckCircle2, Clock, Building2, Tag, CreditCard, TrendingUp,
+  ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
-import { StatusBadge, type SignupStatus } from "@/components/StatusBadge";
+import { resolveTier, poundsLabel } from "@/lib/tiers";
+import { PageHeading, StatCard, Panel, Loading, Empty } from "@/components/admin/AdminUI";
 
-type Driver = {
-  id: string;
-  first_name: string;
-  surname: string;
-  email: string;
-  phone: string;
-  driver_type: string;
-  location: string;
-  status: SignupStatus;
-  created_at: string;
+type Counts = {
+  driversTotal: number;
+  driversPending: number;
+  driversApproved: number;
+  newToday: number;
+  newWeek: number;
+  newMonth: number;
+  bizTotal: number;
+  bizPending: number;
+  bizApproved: number;
+  bizPaying: number;
+  perksTotal: number;
+  perksLive: number;
+  mrrPence: number;
 };
 
-type WaitlistRow = {
-  id: string;
-  full_name: string;
-  email: string;
-  phone: string;
-  driver_type: string;
-  location: string;
-  status: SignupStatus;
-  created_at: string;
-};
+type PendingItem = { id: string; label: string; sub: string; href: string };
 
-type Tab = "drivers" | "waitlist";
-
-export default function AdminDashboard() {
-  const [tab, setTab] = useState<Tab>("drivers");
-  const [drivers, setDrivers] = useState<Driver[] | null>(null);
-  const [waitlist, setWaitlist] = useState<WaitlistRow[] | null>(null);
+export default function AdminOverview() {
+  const [c, setC] = useState<Counts | null>(null);
+  const [queue, setQueue] = useState<PendingItem[]>([]);
 
   useEffect(() => {
     (async () => {
-      const [d, w] = await Promise.all([
-        supabase
-          .from("drivers")
-          .select("id, first_name, surname, email, phone, driver_type, location, status, created_at")
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("driver_signups")
-          .select("id, full_name, email, phone, driver_type, location, status, created_at")
-          .order("created_at", { ascending: false }),
+      const [d, b, p] = await Promise.all([
+        supabase.from("drivers").select("id, first_name, surname, status, created_at"),
+        supabase.from("businesses").select("id, name, category, status, billing_status, plan, created_at"),
+        supabase.from("perks").select("id, is_active"),
       ]);
-      if (d.error) toast.error(`Drivers: ${d.error.message}`);
-      if (w.error) toast.error(`Waitlist: ${w.error.message}`);
-      setDrivers((d.data as Driver[] | null) ?? []);
-      setWaitlist((w.data as WaitlistRow[] | null) ?? []);
+      if (d.error || b.error || p.error) {
+        toast.error((d.error ?? b.error ?? p.error)!.message);
+      }
+
+      const drivers = d.data ?? [];
+      const businesses = b.data ?? [];
+      const perks = p.data ?? [];
+
+      const now = Date.now();
+      const since = (days: number) => now - days * 86_400_000;
+      const newer = (rows: { created_at: string }[], ms: number) =>
+        rows.filter((r) => new Date(r.created_at).getTime() >= ms).length;
+
+      // Real MRR: what active partners are actually billed at, not a projection.
+      const mrrPence = businesses
+        .filter((x) => x.billing_status === "active")
+        .reduce((sum, x) => sum + resolveTier(x.plan).pence, 0);
+
+      setC({
+        driversTotal: drivers.length,
+        driversPending: drivers.filter((x) => x.status === "pending").length,
+        driversApproved: drivers.filter((x) => x.status === "approved").length,
+        newToday: newer(drivers, since(1)),
+        newWeek: newer(drivers, since(7)),
+        newMonth: newer(drivers, since(30)),
+        bizTotal: businesses.length,
+        bizPending: businesses.filter((x) => x.status === "pending").length,
+        bizApproved: businesses.filter((x) => x.status === "approved").length,
+        bizPaying: businesses.filter((x) => x.billing_status === "active").length,
+        perksTotal: perks.length,
+        perksLive: perks.filter((x) => x.is_active).length,
+        mrrPence,
+      });
+
+      setQueue([
+        ...businesses
+          .filter((x) => x.status === "pending")
+          .map((x) => ({
+            id: `b-${x.id}`,
+            label: x.name,
+            sub: `Business application · ${x.category ?? "uncategorised"}`,
+            href: `/admin/businesses/${x.id}`,
+          })),
+        ...drivers
+          .filter((x) => x.status === "pending")
+          .map((x) => ({
+            id: `d-${x.id}`,
+            label: `${x.first_name} ${x.surname}`.trim(),
+            sub: "Road professional awaiting verification",
+            href: `/admin/drivers/${x.id}?source=drivers`,
+          })),
+      ]);
     })();
   }, []);
 
-  const driverStats = countByStatus(drivers);
-  const waitlistStats = countByStatus(waitlist);
-
   return (
     <div className="space-y-8">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="font-display font-black text-3xl md:text-4xl">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage driver accounts and waitlist applications
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button asChild variant="outline_glow">
-            <Link href="/admin/businesses">
-              <Building2 className="size-4" />
-              Businesses
-            </Link>
-          </Button>
-          <Button asChild variant="hero">
-            <Link href="/admin/drivers/new">
-              <Plus className="size-4" />
-              Add driver
-            </Link>
-          </Button>
-        </div>
-      </div>
+      <PageHeading title="Overview" subtitle="Everything at a glance" />
 
-      {/* Stats — drivers first, waitlist as a smaller summary */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard icon={Users} label="Total drivers" value={driverStats.total} />
-        <StatCard
-          icon={Clock}
-          label="Pending"
-          value={driverStats.pending}
-          accent="warning"
-        />
-        <StatCard
-          icon={CheckCircle2}
-          label="Approved"
-          value={driverStats.approved}
-          accent="success"
-        />
-        <StatCard
-          icon={XCircle}
-          label="Rejected"
-          value={driverStats.rejected}
-          accent="destructive"
-        />
-      </div>
-
-      {/* Tabs */}
-      <div className="flex items-center gap-2 hairline-b">
-        <TabButton active={tab === "drivers"} onClick={() => setTab("drivers")}>
-          Drivers ({driverStats.total})
-        </TabButton>
-        <TabButton active={tab === "waitlist"} onClick={() => setTab("waitlist")}>
-          Waitlist ({waitlistStats.total})
-        </TabButton>
-      </div>
-
-      {tab === "drivers" ? (
-        <DriversTable rows={drivers} />
+      {c === null ? (
+        <Panel><Loading /></Panel>
       ) : (
-        <WaitlistTable rows={waitlist} />
+        <>
+          <Section title="Members">
+            <StatCard icon={Users} label="Total members" value={c.driversTotal} />
+            <StatCard icon={CheckCircle2} label="Active members" value={c.driversApproved} accent="success" />
+            <StatCard icon={Clock} label="Awaiting approval" value={c.driversPending} accent="warning" />
+            <StatCard
+              icon={UserPlus}
+              label="New signups"
+              value={c.newMonth}
+              hint={`${c.newToday} today · ${c.newWeek} this week · ${c.newMonth} this month`}
+            />
+          </Section>
+
+          <Section title="Businesses & offers">
+            <StatCard icon={Building2} label="Partner businesses" value={c.bizTotal} />
+            <StatCard icon={Clock} label="Awaiting approval" value={c.bizPending} accent="warning" />
+            <StatCard icon={CheckCircle2} label="Approved" value={c.bizApproved} accent="success" />
+            <StatCard icon={Tag} label="Offers live" value={c.perksLive} hint={`${c.perksTotal} total, incl. drafts`} />
+          </Section>
+
+          <Section title="Revenue">
+            <StatCard icon={CreditCard} label="Paying partners" value={c.bizPaying} accent="success" />
+            <StatCard
+              icon={TrendingUp}
+              label="MRR"
+              value={poundsLabel(c.mrrPence)}
+              hint="Active subscriptions at their plan price"
+            />
+          </Section>
+
+          <Panel title="Needs your attention" subtitle="Applications waiting on a decision">
+            {queue.length === 0 ? (
+              <Empty icon={CheckCircle2} label="Nothing waiting — you're all caught up." />
+            ) : (
+              <ul className="divide-y divide-border/20">
+                {queue.map((item) => (
+                  <li key={item.id} className="flex items-center justify-between gap-4 px-6 py-4">
+                    <div className="min-w-0">
+                      <div className="font-semibold truncate">{item.label}</div>
+                      <div className="text-xs text-muted-foreground truncate">{item.sub}</div>
+                    </div>
+                    <Button asChild size="sm" variant="outline_glow">
+                      <Link href={item.href}>
+                        Review <ArrowRight className="size-3.5" />
+                      </Link>
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
+        </>
       )}
     </div>
   );
 }
 
-function DriversTable({ rows }: { rows: Driver[] | null }) {
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="glass-strong rounded-2xl overflow-hidden">
-      <div className="p-6 border-b border-border/40">
-        <h2 className="font-display font-bold text-xl">Driver accounts</h2>
-        <p className="text-xs text-muted-foreground mt-1">
-          Real accounts (signed up via /signup, can log in)
-        </p>
-      </div>
-      {rows === null ? (
-        <Loading />
-      ) : rows.length === 0 ? (
-        <Empty label="No driver accounts yet. Drivers can sign up at /signup." />
-      ) : (
-        <Table>
-          <thead>
-            <tr className="border-b border-border/40">
-              <Th>Name</Th>
-              <Th>Type</Th>
-              <Th>Location</Th>
-              <Th>Phone</Th>
-              <Th>Status</Th>
-              <Th>Joined</Th>
-              <Th />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr
-                key={r.id}
-                className="border-b border-border/20 hover:bg-primary/5 transition-colors"
-              >
-                <Td>
-                  <div className="font-semibold">
-                    {r.first_name} {r.surname}
-                  </div>
-                  <div className="text-xs text-muted-foreground">{r.email}</div>
-                </Td>
-                <Td>{r.driver_type}</Td>
-                <Td>{r.location}</Td>
-                <Td className="font-mono text-xs">{r.phone}</Td>
-                <Td>
-                  <StatusBadge status={r.status} />
-                </Td>
-                <Td className="text-xs text-muted-foreground">
-                  {new Date(r.created_at).toLocaleDateString()}
-                </Td>
-                <Td>
-                  <Button asChild size="sm" variant="outline_glow">
-                    <Link href={`/admin/drivers/${r.id}?source=drivers`}>
-                      <Eye className="size-3.5" /> View
-                    </Link>
-                  </Button>
-                </Td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-      )}
+    <div className="space-y-3">
+      <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{title}</h2>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">{children}</div>
     </div>
   );
-}
-
-function WaitlistTable({ rows }: { rows: WaitlistRow[] | null }) {
-  return (
-    <div className="glass-strong rounded-2xl overflow-hidden">
-      <div className="p-6 border-b border-border/40">
-        <h2 className="font-display font-bold text-xl">Waitlist</h2>
-        <p className="text-xs text-muted-foreground mt-1">
-          Marketing signups via /join — pre-account
-        </p>
-      </div>
-      {rows === null ? (
-        <Loading />
-      ) : rows.length === 0 ? (
-        <Empty label="No waitlist signups yet." />
-      ) : (
-        <Table>
-          <thead>
-            <tr className="border-b border-border/40">
-              <Th>Name</Th>
-              <Th>Type</Th>
-              <Th>Location</Th>
-              <Th>Phone</Th>
-              <Th>Status</Th>
-              <Th>Date</Th>
-              <Th />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr
-                key={r.id}
-                className="border-b border-border/20 hover:bg-primary/5 transition-colors"
-              >
-                <Td>
-                  <div className="font-semibold">{r.full_name}</div>
-                  <div className="text-xs text-muted-foreground">{r.email}</div>
-                </Td>
-                <Td>{r.driver_type}</Td>
-                <Td>{r.location}</Td>
-                <Td className="font-mono text-xs">{r.phone}</Td>
-                <Td>
-                  <StatusBadge status={r.status} />
-                </Td>
-                <Td className="text-xs text-muted-foreground">
-                  {new Date(r.created_at).toLocaleDateString()}
-                </Td>
-                <Td>
-                  <Button asChild size="sm" variant="outline_glow">
-                    <Link href={`/admin/drivers/${r.id}?source=waitlist`}>
-                      <Eye className="size-3.5" /> View
-                    </Link>
-                  </Button>
-                </Td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-      )}
-    </div>
-  );
-}
-
-/* ---------- helpers ---------- */
-
-function countByStatus<T extends { status: SignupStatus }>(rows: T[] | null) {
-  return {
-    total: rows?.length ?? 0,
-    pending: rows?.filter((r) => r.status === "pending").length ?? 0,
-    approved: rows?.filter((r) => r.status === "approved").length ?? 0,
-    rejected: rows?.filter((r) => r.status === "rejected").length ?? 0,
-  };
-}
-
-function TabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`px-4 py-3 -mb-px text-sm font-semibold border-b-2 transition-colors ${
-        active
-          ? "border-primary text-foreground"
-          : "border-transparent text-muted-foreground hover:text-foreground"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function Loading() {
-  return (
-    <div className="p-12 grid place-items-center">
-      <Loader2 className="animate-spin text-primary" />
-    </div>
-  );
-}
-
-function Empty({ label }: { label: string }) {
-  return (
-    <div className="p-12 text-center text-muted-foreground">
-      <Users className="size-12 mx-auto mb-3 opacity-40" />
-      {label}
-    </div>
-  );
-}
-
-function Table({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">{children}</table>
-    </div>
-  );
-}
-
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-  accent,
-}: {
-  icon: typeof Users;
-  label: string;
-  value: number;
-  accent?: "warning" | "success" | "destructive";
-}) {
-  const colorMap = {
-    warning: "from-yellow-500 to-orange-500",
-    success: "from-green-500 to-emerald-500",
-    destructive: "from-red-500 to-rose-500",
-  };
-  return (
-    <div className="glass rounded-2xl p-5 hover:border-primary/40 transition-colors">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="text-xs uppercase tracking-wider text-muted-foreground">{label}</div>
-          <div className="font-display font-black text-3xl mt-1">{value}</div>
-        </div>
-        <div
-          className={`size-11 rounded-xl grid place-items-center ${
-            accent ? `bg-gradient-to-br ${colorMap[accent]}` : "bg-gradient-primary"
-          }`}
-        >
-          <Icon className="size-5 text-white" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Th({ children }: { children?: React.ReactNode }) {
-  return (
-    <th className="text-left px-6 py-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">
-      {children}
-    </th>
-  );
-}
-function Td({ children, className = "" }: { children?: React.ReactNode; className?: string }) {
-  return <td className={`px-6 py-4 ${className}`}>{children}</td>;
 }

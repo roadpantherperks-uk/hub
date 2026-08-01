@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Building2, Clock, CheckCircle2, CreditCard, Eye, Loader2 } from "lucide-react";
+import { Building2, Clock, CheckCircle2, CreditCard, Eye, Loader2, Plus } from "lucide-react";
+import { displayBusinessCategory } from "@/lib/options";
 import { toast } from "sonner";
 import {
   BusinessStatusBadge,
@@ -18,6 +19,7 @@ type Business = {
   name: string;
   contact_email: string;
   category: string | null;
+  category_other: string | null;
   location: string | null;
   status: BusinessStatus;
   billing_status: BillingStatus;
@@ -34,7 +36,7 @@ export default function AdminBusinesses() {
     (async () => {
       const { data, error } = await supabase
         .from("businesses")
-        .select("id, name, contact_email, category, location, status, billing_status, created_at")
+        .select("id, name, contact_email, category, category_other, location, status, billing_status, created_at")
         .order("created_at", { ascending: false });
       if (error) toast.error(error.message);
       setRows((data as Business[] | null) ?? []);
@@ -54,8 +56,10 @@ export default function AdminBusinesses() {
             Partner applications, approvals and membership status
           </p>
         </div>
-        <Button asChild variant="outline_glow">
-          <Link href="/admin">← Drivers dashboard</Link>
+        <Button asChild variant="hero">
+          <Link href="/admin/businesses/new">
+            <Plus className="size-4" /> Add business
+          </Link>
         </Button>
       </div>
 
@@ -113,7 +117,7 @@ function BusinessTable({ rows }: { rows: Business[] | null }) {
                     <div className="font-semibold">{r.name}</div>
                     <div className="text-xs text-muted-foreground">{r.contact_email}</div>
                   </td>
-                  <td className="px-6 py-4">{r.category ?? "—"}</td>
+                  <td className="px-6 py-4">{displayBusinessCategory(r.category, r.category_other)}</td>
                   <td className="px-6 py-4">{r.location ?? "—"}</td>
                   <td className="px-6 py-4"><BusinessStatusBadge status={r.status} /></td>
                   <td className="px-6 py-4"><BillingBadge status={r.billing_status} /></td>

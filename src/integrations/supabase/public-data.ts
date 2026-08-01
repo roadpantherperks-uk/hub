@@ -2,6 +2,7 @@ import "server-only";
 
 import { adminClient } from "./admin-client";
 import { resolveTier } from "@/lib/tiers";
+import { OTHER_VALUE } from "@/lib/options";
 
 /**
  * Public read helpers for the marketing pages. These run on the server with the
@@ -27,16 +28,27 @@ export async function getApprovedPartners(): Promise<PublicPartner[]> {
     const sb = adminClient();
     const { data } = await sb
       .from("businesses")
-      .select("id, name, slug, description, category, location, logo_url, website, plan")
+      .select("id, name, slug, description, category, category_other, location, logo_url, website, plan")
       .eq("status", "approved");
 
-    type Row = Omit<PublicPartner, "badge" | "recommended"> & { plan: string | null };
+    type Row = Omit<PublicPartner, "badge" | "recommended" | "category"> & {
+      category: string | null;
+      category_other: string | null;
+      plan: string | null;
+    };
     const rows = (data as Row[] | null) ?? [];
 
     return rows
-      .map((r) => {
+      .map(({ category, category_other, ...r }) => {
         const tier = resolveTier(r.plan);
-        return { ...r, badge: tier.badge, recommended: tier.recommended };
+        return {
+          ...r,
+          // Publicly a business is whatever it actually does — show the typed
+          // trade rather than the bare word "Other".
+          category: category === OTHER_VALUE ? category_other || null : category,
+          badge: tier.badge,
+          recommended: tier.recommended,
+        };
       })
       // Advanced (recommended) partners rank above Basic, then alphabetical.
       .sort((a, b) => Number(b.recommended) - Number(a.recommended) || a.name.localeCompare(b.name));

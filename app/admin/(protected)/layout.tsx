@@ -1,15 +1,48 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
-import { LogOut, Loader2 } from "lucide-react";
+import {
+  LogOut,
+  Loader2,
+  LayoutDashboard,
+  Users,
+  Building2,
+  Tag,
+  CreditCard,
+  Menu,
+  X,
+  type LucideIcon,
+} from "lucide-react";
+
+/**
+ * Sidebar shell: sections on the left, the selected one on the right.
+ *
+ * Only sections backed by real data are listed. The client's spec also names
+ * Analytics, Notifications, Communications and Platform Settings — those have
+ * nothing behind them yet, and an empty screen behind a nav item reads worse
+ * than no nav item, so they're added when their features land.
+ */
+
+type NavItem = { href: string; label: string; icon: LucideIcon };
+
+const NAV: NavItem[] = [
+  { href: "/admin", label: "Overview", icon: LayoutDashboard },
+  { href: "/admin/drivers", label: "Road Professionals", icon: Users },
+  { href: "/admin/businesses", label: "Businesses", icon: Building2 },
+  { href: "/admin/perks", label: "Perks & Offers", icon: Tag },
+  { href: "/admin/payments", label: "Payments", icon: CreditCard },
+];
 
 export default function AdminProtectedLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [ready, setReady] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -37,6 +70,9 @@ export default function AdminProtectedLayout({ children }: { children: React.Rea
     };
   }, [router]);
 
+  // Close the mobile drawer whenever the route changes.
+  useEffect(() => setNavOpen(false), [pathname]);
+
   const logout = async () => {
     await supabase.auth.signOut();
     router.replace("/admin/login");
@@ -52,11 +88,19 @@ export default function AdminProtectedLayout({ children }: { children: React.Rea
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="glass-strong border-b border-border/40 sticky top-0 z-40">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+      <header className="glass-strong border-b border-border/40 sticky top-0 z-50">
+        <div className="px-4 h-16 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              type="button"
+              onClick={() => setNavOpen((v) => !v)}
+              className="lg:hidden grid place-items-center size-9 rounded-lg hover:bg-primary/10 transition-colors"
+              aria-label={navOpen ? "Close menu" : "Open menu"}
+            >
+              {navOpen ? <X className="size-5" /> : <Menu className="size-5" />}
+            </button>
             <Logo />
-            <span className="text-xs font-bold tracking-[0.2em] text-primary border-l border-border/60 pl-3 ml-1">
+            <span className="hidden sm:inline text-xs font-bold tracking-[0.2em] text-primary border-l border-border/60 pl-3">
               ADMIN
             </span>
           </div>
@@ -65,7 +109,56 @@ export default function AdminProtectedLayout({ children }: { children: React.Rea
           </Button>
         </div>
       </header>
-      <main className="container mx-auto px-4 py-8">{children}</main>
+
+      <div className="flex">
+        {/* Desktop sidebar */}
+        <aside className="hidden lg:block w-60 shrink-0 border-r border-border/40 min-h-[calc(100vh-4rem)] sticky top-16 self-start">
+          <SideNav pathname={pathname} />
+        </aside>
+
+        {/* Mobile drawer */}
+        {navOpen && (
+          <>
+            <div
+              className="lg:hidden fixed inset-0 top-16 z-40 bg-black/60"
+              onClick={() => setNavOpen(false)}
+            />
+            <aside className="lg:hidden fixed top-16 left-0 bottom-0 z-40 w-64 glass-strong border-r border-border/40 overflow-y-auto">
+              <SideNav pathname={pathname} />
+            </aside>
+          </>
+        )}
+
+        <main className="flex-1 min-w-0 px-4 sm:px-6 py-8">{children}</main>
+      </div>
     </div>
+  );
+}
+
+function SideNav({ pathname }: { pathname: string | null }) {
+  return (
+    <nav className="p-3 space-y-1">
+      {NAV.map((item) => {
+        // Overview must match exactly, or every child route would light it up.
+        const active =
+          item.href === "/admin"
+            ? pathname === "/admin"
+            : (pathname?.startsWith(item.href) ?? false);
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+              active
+                ? "bg-primary/15 text-foreground"
+                : "text-muted-foreground hover:text-foreground hover:bg-primary/5"
+            }`}
+          >
+            <item.icon className={`size-4 shrink-0 ${active ? "text-primary" : ""}`} />
+            {item.label}
+          </Link>
+        );
+      })}
+    </nav>
   );
 }

@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { BusinessStatusBadge, BillingBadge } from "@/components/BusinessBadges";
 import { TIERS, resolveTier, type PlanKey } from "@/lib/tiers";
+import { BUSINESS_CATEGORIES, OTHER_VALUE } from "@/lib/options";
 import {
   ArrowLeft, Loader2, Check, X, Save, CreditCard, Copy, Plus, Trash2, Tag,
 } from "lucide-react";
@@ -31,6 +32,7 @@ type Business = {
   website: string | null;
   description: string | null;
   category: string | null;
+  category_other: string | null;
   location: string | null;
   status: "pending" | "approved" | "rejected" | "suspended";
   billing_status: "none" | "checkout_started" | "active" | "past_due" | "canceled";
@@ -64,7 +66,7 @@ export default function BusinessDetail() {
 
   const [edit, setEdit] = useState({
     name: "", contact_name: "", contact_email: "", contact_phone: "",
-    website: "", category: "", location: "", description: "", admin_note: "",
+    website: "", category: "", category_other: "", location: "", description: "", admin_note: "",
   });
 
   const load = async () => {
@@ -89,6 +91,7 @@ export default function BusinessDetail() {
       contact_phone: business.contact_phone ?? "",
       website: business.website ?? "",
       category: business.category ?? "",
+      category_other: business.category_other ?? "",
       location: business.location ?? "",
       description: business.description ?? "",
       admin_note: business.admin_note ?? "",
@@ -121,6 +124,7 @@ export default function BusinessDetail() {
       contact_phone: edit.contact_phone || null,
       website: edit.website || null,
       category: edit.category || null,
+      category_other: edit.category_other || null,
       location: edit.location || null,
       description: edit.description || null,
       admin_note: edit.admin_note || null,
@@ -240,7 +244,36 @@ export default function BusinessDetail() {
         <div className="text-sm font-semibold">Business details</div>
         <div className="grid sm:grid-cols-2 gap-4">
           <Field label="Name" value={edit.name} onChange={(v) => setEdit({ ...edit, name: v })} />
-          <Field label="Category" value={edit.category} onChange={(v) => setEdit({ ...edit, category: v })} />
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Category</label>
+            <select
+              value={edit.category}
+              onChange={(e) =>
+                setEdit({
+                  ...edit,
+                  category: e.target.value,
+                  category_other: e.target.value === OTHER_VALUE ? edit.category_other : "",
+                })
+              }
+              className={fieldCls}
+            >
+              <option value="">— select —</option>
+              {BUSINESS_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              {/* Applications from before the list changed may hold a retired value. */}
+              {edit.category && !BUSINESS_CATEGORIES.includes(edit.category as never) && (
+                <option value={edit.category}>{edit.category} (retired)</option>
+              )}
+            </select>
+            {edit.category === OTHER_VALUE && (
+              <input
+                value={edit.category_other}
+                onChange={(e) => setEdit({ ...edit, category_other: e.target.value })}
+                className={`${fieldCls} mt-2`}
+                placeholder="What type of business are they?"
+                maxLength={80}
+              />
+            )}
+          </div>
           <Field label="Contact name" value={edit.contact_name} onChange={(v) => setEdit({ ...edit, contact_name: v })} />
           <Field label="Contact email" value={edit.contact_email} onChange={(v) => setEdit({ ...edit, contact_email: v })} />
           <Field label="Phone" value={edit.contact_phone} onChange={(v) => setEdit({ ...edit, contact_phone: v })} />
@@ -381,6 +414,9 @@ function PerksManager({
     </div>
   );
 }
+
+const fieldCls =
+  "block w-full h-11 rounded-xl bg-background hairline px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand/40";
 
 function Field({
   label, value, onChange, textarea,

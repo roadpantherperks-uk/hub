@@ -10,7 +10,8 @@ import {
   ADMIN_NOTIFY_EMAIL,
 } from "../email";
 import { createPartnerCheckout } from "../stripe";
-import { TIERS, resolveTier, type PlanKey } from "@/lib/tiers";
+import { TIERS, resolveTier, poundsLabel, type PlanKey } from "@/lib/tiers";
+import { OTHER_VALUE, displayBusinessCategory } from "@/lib/options";
 import type { Database } from "./types";
 
 export type ActionResult<T = undefined> =
@@ -34,11 +35,13 @@ function slugify(name: string): string {
 
 export type PartnerApplicationInput = {
   business_name: string;
-  contact_name: string;
+  // Required on the public form, optional when an admin adds a business by hand.
+  contact_name?: string;
   contact_email: string;
   contact_phone?: string;
   website?: string;
   category?: string;
+  category_other?: string;
   location?: string;
   description?: string;
 };
@@ -60,6 +63,9 @@ export async function applyToPartner(
     contact_phone: input.contact_phone?.trim() || null,
     website: input.website?.trim() || null,
     category: input.category?.trim() || null,
+    // Only meaningful alongside category === 'Other'; never store a stray value.
+    category_other:
+      input.category?.trim() === OTHER_VALUE ? input.category_other?.trim() || null : null,
     location: input.location?.trim() || null,
     description: input.description?.trim() || null,
     status: "pending",
@@ -90,7 +96,7 @@ export async function applyToPartner(
         "Thanks — we've got your application",
         `<p>Hi ${escapeHtml(input.contact_name?.trim() || "there")},</p>
          <p>Thanks for applying to become a Road Panther Perks partner. Our team will review your details and get back to you shortly.</p>
-         <p>Once approved, we'll email you a secure link to activate your Founding Partner membership (£150/month).</p>
+         <p>Once approved, we'll email you a secure link to choose your plan and activate your membership — ${poundsLabel(TIERS.basic.pence)}/month for a Basic listing or ${poundsLabel(TIERS.advanced.pence)}/month for Advanced.</p>
          <p>— The Road Panther Perks team</p>`,
       ),
     }),
@@ -105,7 +111,7 @@ export async function applyToPartner(
                <li>Contact: ${escapeHtml(input.contact_name?.trim() || "—")}</li>
                <li>Email: ${escapeHtml(input.contact_email.trim())}</li>
                <li>Phone: ${escapeHtml(input.contact_phone?.trim() || "—")}</li>
-               <li>Category: ${escapeHtml(input.category?.trim() || "—")}</li>
+               <li>Category: ${escapeHtml(displayBusinessCategory(input.category?.trim(), input.category_other?.trim()))}</li>
                <li>Location: ${escapeHtml(input.location?.trim() || "—")}</li>
              </ul>
              <p><a href="${SITE_URL}/admin/businesses/${data.id}">Review in admin →</a></p>`,
@@ -113,6 +119,60 @@ export async function applyToPartner(
         })
       : Promise.resolve(),
   ]);
+
+  return { ok: true, data: { business_id: data.id } };
+}
+
+/* ------------------------------------------------------------------ admin: create */
+
+export type AdminBusinessInput = PartnerApplicationInput & {
+  status?: Database["public"]["Enums"]["business_status"];
+  plan?: PlanKey;
+  admin_note?: string;
+};
+
+/**
+ * Add a business by hand from the admin area — for partners signed up over the
+ * phone or in person, who never touch the public application form.
+ *
+ * Differs from applyToPartner deliberately: the admin picks the status (so a
+ * business can go straight to approved) and the plan, and NO email is sent. The
+ * admin lands on the detail page afterwards and generates a payment link there
+ * when they're ready, rather than having one fired off automatically.
+ */
+export async function adminCreateBusiness(
+  input: AdminBusinessInput,
+): Promise<ActionResult<{ business_id: string }>> {
+  if (!(await hasRole("admin"))) return { ok: false, error: "Not authorized" };
+  if (!input.business_name?.trim()) return { ok: false, error: "Business name is required" };
+  if (!input.contact_email?.trim()) return { ok: false, error: "Contact email is required" };
+
+  const sb = adminClient();
+
+  const insert: Database["public"]["Tables"]["businesses"]["Insert"] = {
+    name: input.business_name.trim(),
+    slug: slugify(input.business_name),
+    contact_name: input.contact_name?.trim() || null,
+    contact_email: input.contact_email.trim(),
+    contact_phone: input.contact_phone?.trim() || null,
+    website: input.website?.trim() || null,
+    category: input.category?.trim() || null,
+    category_other:
+      input.category?.trim() === OTHER_VALUE ? input.category_other?.trim() || null : null,
+    location: input.location?.trim() || null,
+    description: input.description?.trim() || null,
+    admin_note: input.admin_note?.trim() || null,
+    status: input.status ?? "approved",
+    plan: input.plan ?? "basic",
+    billing_status: "none",
+  };
+
+  const { data, error } = await sb.from("businesses").insert(insert).select("id").single();
+  if (error || !data) {
+    return { ok: false, error: error?.message ?? "Could not create the business" };
+  }
+
+  await sb.from("business_relationships").insert({ business_id: data.id, type: "perk_partner" });
 
   return { ok: true, data: { business_id: data.id } };
 }
@@ -230,6 +290,7 @@ export async function adminUpdateBusiness(input: {
   contact_phone?: string | null;
   website?: string | null;
   category?: string | null;
+  category_other?: string | null;
   location?: string | null;
   description?: string | null;
   admin_note?: string | null;
@@ -243,7 +304,12 @@ export async function adminUpdateBusiness(input: {
   if (input.contact_email !== undefined) patch.contact_email = input.contact_email;
   if (input.contact_phone !== undefined) patch.contact_phone = input.contact_phone;
   if (input.website !== undefined) patch.website = input.website;
-  if (input.category !== undefined) patch.category = input.category;
+  if (input.category !== undefined) {
+    patch.category = input.category;
+    // Keep the pair consistent: the free text only survives while 'Other' is set.
+    patch.category_other =
+      input.category === OTHER_VALUE ? (input.category_other ?? null) : null;
+  }
   if (input.location !== undefined) patch.location = input.location;
   if (input.description !== undefined) patch.description = input.description;
   if (input.admin_note !== undefined) patch.admin_note = input.admin_note;
@@ -362,7 +428,7 @@ export async function notifyAdminNewDriver(input: {
     html: emailLayout(
       "New driver signup",
       `<p><strong>${escapeHtml(name)}</strong> (${escapeHtml(input.email)}) just signed up and is awaiting review.</p>
-       <p><a href="${SITE_URL}/admin">Open the admin dashboard →</a></p>`,
+       <p><a href="${SITE_URL}/admin/drivers">Review in admin →</a></p>`,
     ),
   });
 }
