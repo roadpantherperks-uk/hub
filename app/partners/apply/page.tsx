@@ -59,8 +59,8 @@ export default function PartnerApply() {
           <h1 className="text-3xl font-semibold tracking-[-0.03em]">Application received</h1>
           <p className="text-muted-foreground mt-4 leading-relaxed">
             Thanks — we&apos;ve got your details and sent a confirmation to your email. Our team will review
-            your application and be in touch. Once approved, you&apos;ll get a secure link to activate your
-            Founding Partner membership.
+            your application and be in touch. Once approved, you&apos;ll get a secure link to choose
+            your plan and activate your membership.
           </p>
           <Link href="/" className="mt-8 inline-flex items-center gap-1.5 text-brand font-medium hover:underline">
             Back to home <ArrowRight className="size-4" />

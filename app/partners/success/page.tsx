@@ -10,7 +10,7 @@ export default function PartnerSuccess() {
     <PublicShell>
       <div className="max-w-xl mx-auto px-6 lg:px-8 text-center pt-8">
         <CheckCircle2 className="size-14 mx-auto text-brand mb-6" strokeWidth={1.5} />
-        <h1 className="text-3xl font-semibold tracking-[-0.03em]">You&apos;re a Founding Partner 🎉</h1>
+        <h1 className="text-3xl font-semibold tracking-[-0.03em]">You&apos;re a Road Panther Partner 🎉</h1>
         <p className="text-muted-foreground mt-4 leading-relaxed">
           Payment received and your membership is now active. We&apos;ve emailed your confirmation. Our team will
           be in touch to get your perks and branding live on the platform.

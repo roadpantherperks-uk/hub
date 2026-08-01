@@ -16,7 +16,7 @@ const DRIVER_STEPS = [
 
 const BUSINESS_STEPS = [
   { icon: Building2, title: "Apply to partner", desc: "Tell us about your business and the offer you'd bring to our members." },
-  { icon: Handshake, title: "Get approved", desc: "Once approved, activate your Founding Partner membership securely via Stripe." },
+  { icon: Handshake, title: "Get approved", desc: "Once approved, choose your plan and activate your membership securely via Stripe." },
   { icon: Megaphone, title: "Reach drivers", desc: "Your perk goes live in front of a growing community of verified road professionals." },
 ];
 
