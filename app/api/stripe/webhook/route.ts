@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { constructWebhookEvent } from "@/integrations/stripe";
 import { adminClient } from "@/integrations/supabase/admin-client";
-import { sendEmail, emailLayout, ADMIN_NOTIFY_EMAIL } from "@/integrations/email";
+import { sendEmail, emailLayout, escapeHtml, ADMIN_NOTIFY_EMAIL } from "@/integrations/email";
 
 // Stripe needs the raw body for signature verification, so no parsing/caching.
 export const runtime = "nodejs";
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
                 subject: "Your Road Panther Perks membership is live",
                 html: emailLayout(
                   "You're live 🎉",
-                  `<p>Hi,</p><p><strong>${biz.name}</strong> is now an active Road Panther Perks partner. Welcome aboard!</p>`,
+                  `<p>Hi,</p><p><strong>${escapeHtml(biz.name)}</strong> is now an active Road Panther Perks partner. Welcome aboard!</p>`,
                 ),
               }),
               ADMIN_NOTIFY_EMAIL
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
                     subject: `💷 Payment received: ${biz.name}`,
                     html: emailLayout(
                       "Partner activated",
-                      `<p><strong>${biz.name}</strong> completed checkout and is now active.</p>`,
+                      `<p><strong>${escapeHtml(biz.name)}</strong> completed checkout and is now active.</p>`,
                     ),
                   })
                 : Promise.resolve(),

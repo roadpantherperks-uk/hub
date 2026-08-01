@@ -2,7 +2,13 @@
 
 import { adminClient } from "./admin-client";
 import { hasRole } from "./server";
-import { sendEmail, emailLayout, ADMIN_NOTIFY_EMAIL } from "../email";
+import {
+  sendEmail,
+  emailLayout,
+  escapeHtml,
+  displayName,
+  ADMIN_NOTIFY_EMAIL,
+} from "../email";
 import { createPartnerCheckout } from "../stripe";
 import { TIERS, resolveTier, type PlanKey } from "@/lib/tiers";
 import type { Database } from "./types";
@@ -82,7 +88,7 @@ export async function applyToPartner(
       subject: "We've received your Road Panther Perks application",
       html: emailLayout(
         "Thanks — we've got your application",
-        `<p>Hi ${input.contact_name?.trim() || "there"},</p>
+        `<p>Hi ${escapeHtml(input.contact_name?.trim() || "there")},</p>
          <p>Thanks for applying to become a Road Panther Perks partner. Our team will review your details and get back to you shortly.</p>
          <p>Once approved, we'll email you a secure link to activate your Founding Partner membership (£150/month).</p>
          <p>— The Road Panther Perks team</p>`,
@@ -94,13 +100,13 @@ export async function applyToPartner(
           subject: `New partner application: ${input.business_name.trim()}`,
           html: emailLayout(
             "New partner application",
-            `<p><strong>${input.business_name.trim()}</strong> has applied to join.</p>
+            `<p><strong>${escapeHtml(input.business_name.trim())}</strong> has applied to join.</p>
              <ul>
-               <li>Contact: ${input.contact_name?.trim() || "—"}</li>
-               <li>Email: ${input.contact_email.trim()}</li>
-               <li>Phone: ${input.contact_phone?.trim() || "—"}</li>
-               <li>Category: ${input.category?.trim() || "—"}</li>
-               <li>Location: ${input.location?.trim() || "—"}</li>
+               <li>Contact: ${escapeHtml(input.contact_name?.trim() || "—")}</li>
+               <li>Email: ${escapeHtml(input.contact_email.trim())}</li>
+               <li>Phone: ${escapeHtml(input.contact_phone?.trim() || "—")}</li>
+               <li>Category: ${escapeHtml(input.category?.trim() || "—")}</li>
+               <li>Location: ${escapeHtml(input.location?.trim() || "—")}</li>
              </ul>
              <p><a href="${SITE_URL}/admin/businesses/${data.id}">Review in admin →</a></p>`,
           ),
@@ -190,8 +196,8 @@ export async function adminSetBusinessStatus(input: {
       subject: "You're approved — activate your Road Panther Perks membership",
       html: emailLayout(
         "You're approved 🎉",
-        `<p>Hi ${biz.contact_name || "there"},</p>
-         <p><strong>${biz.name}</strong> has been approved as a Road Panther Perks partner.</p>
+        `<p>Hi ${escapeHtml(biz.contact_name || "there")},</p>
+         <p><strong>${escapeHtml(biz.name)}</strong> has been approved as a Road Panther Perks partner.</p>
          <p>Choose your plan and activate your membership to go live —
             Basic (${TIERS.basic.label}, £9/month) or Advanced (${TIERS.advanced.label}, £24/month):</p>
          <p><a href="${SITE_URL}/partners/pay/${biz.id}"
@@ -206,8 +212,8 @@ export async function adminSetBusinessStatus(input: {
       subject: "Update on your Road Panther Perks application",
       html: emailLayout(
         "About your application",
-        `<p>Hi ${biz.contact_name || "there"},</p>
-         <p>Thanks for your interest in Road Panther Perks. On this occasion we're not able to move forward with <strong>${biz.name}</strong>.</p>
+        `<p>Hi ${escapeHtml(biz.contact_name || "there")},</p>
+         <p>Thanks for your interest in Road Panther Perks. On this occasion we're not able to move forward with <strong>${escapeHtml(biz.name)}</strong>.</p>
          <p>If you think this was a mistake, just reply to this email.</p>`,
       ),
     });
@@ -349,12 +355,13 @@ export async function notifyAdminNewDriver(input: {
   email: string;
 }): Promise<void> {
   if (!ADMIN_NOTIFY_EMAIL) return;
+  const name = displayName([input.name]);
   await sendEmail({
     to: ADMIN_NOTIFY_EMAIL,
-    subject: `New driver signup: ${input.name}`,
+    subject: `New driver signup: ${name}`,
     html: emailLayout(
       "New driver signup",
-      `<p><strong>${input.name}</strong> (${input.email}) just signed up and is awaiting review.</p>
+      `<p><strong>${escapeHtml(name)}</strong> (${escapeHtml(input.email)}) just signed up and is awaiting review.</p>
        <p><a href="${SITE_URL}/admin">Open the admin dashboard →</a></p>`,
     ),
   });

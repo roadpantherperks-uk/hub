@@ -3,7 +3,13 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSupabaseServerClient } from "./server";
-import { sendEmail, emailLayout, ADMIN_NOTIFY_EMAIL } from "../email";
+import {
+  sendEmail,
+  emailLayout,
+  escapeHtml,
+  displayName,
+  ADMIN_NOTIFY_EMAIL,
+} from "../email";
 
 export type ActionResult<T = undefined> =
   | { ok: true; data?: T }
@@ -54,12 +60,13 @@ export async function signUpDriver(input: DriverSignupInput): Promise<ActionResu
     const siteUrl =
       process.env.NEXT_PUBLIC_SITE_URL ??
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+    const name = displayName([input.first_name, input.surname]);
     void sendEmail({
       to: ADMIN_NOTIFY_EMAIL,
-      subject: `New driver signup: ${input.first_name} ${input.surname}`,
+      subject: `New driver signup: ${name}`,
       html: emailLayout(
         "New driver signup",
-        `<p><strong>${input.first_name} ${input.surname}</strong> (${input.email}) just signed up and is awaiting review.</p>
+        `<p><strong>${escapeHtml(name)}</strong> (${escapeHtml(input.email)}) just signed up and is awaiting review.</p>
          <p><a href="${siteUrl}/admin">Open the admin dashboard →</a></p>`,
       ),
     });

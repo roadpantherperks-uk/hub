@@ -68,6 +68,41 @@ export async function sendEmail({ to, subject, html }: SendArgs): Promise<boolea
   }
 }
 
+/**
+ * Escape a user-supplied value for interpolation into email HTML.
+ *
+ * Every template below builds HTML by string concatenation, so any value that
+ * originates from a signup form (names, business names, free-text location)
+ * must go through this first. Without it a name containing & or < silently
+ * corrupts the markup, and a deliberately crafted one injects into the admin's
+ * inbox.
+ *
+ * Also collapses null/undefined to "" rather than the string "undefined",
+ * which is what a partial payload used to render as.
+ */
+export function escapeHtml(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/**
+ * Join name parts into a display name, dropping blank/missing pieces.
+ * Returns the fallback when nothing usable is left, so an incomplete payload
+ * never renders as "undefined undefined".
+ */
+export function displayName(parts: unknown[], fallback = "(name not provided)"): string {
+  const joined = parts
+    .map((p) => (p === null || p === undefined ? "" : String(p).trim()))
+    .filter(Boolean)
+    .join(" ");
+  return joined || fallback;
+}
+
 /** Minimal branded wrapper so all emails look consistent. */
 export function emailLayout(heading: string, bodyHtml: string): string {
   return `
