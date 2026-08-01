@@ -24,6 +24,27 @@ async function setBilling(
   return data;
 }
 
+/**
+ * Pull the subscription id off an Invoice.
+ *
+ * Stripe's Basil release (2025-03-31) removed `invoice.subscription` and moved
+ * it to `parent.subscription_details.subscription`. We read the new location
+ * first and fall back to the old one, so this works whichever API version the
+ * event destination is pinned to — and keeps working if it's changed later.
+ */
+function invoiceSubscriptionId(invoice: Record<string, unknown>): string | undefined {
+  const parent = invoice.parent as
+    | { subscription_details?: { subscription?: unknown } }
+    | undefined;
+  const raw = parent?.subscription_details?.subscription ?? invoice.subscription;
+  if (typeof raw === "string") return raw;
+  // Can arrive expanded as a full object rather than an id.
+  if (raw && typeof raw === "object" && "id" in raw) {
+    return (raw as { id: string }).id;
+  }
+  return undefined;
+}
+
 export async function POST(req: NextRequest) {
   const payload = await req.text();
   const sig = req.headers.get("stripe-signature");
@@ -78,8 +99,15 @@ export async function POST(req: NextRequest) {
         break;
       }
       case "invoice.payment_failed": {
-        const subId = object.subscription as string | undefined;
+        const subId = invoiceSubscriptionId(object);
         if (subId) await setBilling({ column: "stripe_subscription_id", value: subId }, "past_due");
+        break;
+      }
+      case "invoice.payment_succeeded": {
+        // Recovery from past_due. Without this a partner whose card failed once
+        // stays flagged for ever, even after they've paid.
+        const subId = invoiceSubscriptionId(object);
+        if (subId) await setBilling({ column: "stripe_subscription_id", value: subId }, "active");
         break;
       }
       case "customer.subscription.deleted": {
