@@ -25,6 +25,12 @@ export default async function DashboardLayout({
               Home
             </Link>
             <Link
+              href="/dashboard/card"
+              className="text-sm font-medium hover:text-brand transition-colors"
+            >
+              My card
+            </Link>
+            <Link
               href="/dashboard/profile"
               className="text-sm font-medium hover:text-brand transition-colors"
             >

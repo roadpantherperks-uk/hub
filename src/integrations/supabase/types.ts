@@ -92,6 +92,8 @@ export type Database = {
           location: string
           location_other: string | null
           verification_doc_url: string
+          photo_url: string | null
+          member_number: number
           status: Database["public"]["Enums"]["signup_status"]
           admin_note: string | null
           created_at: string
@@ -108,6 +110,8 @@ export type Database = {
           location: string
           location_other?: string | null
           verification_doc_url: string
+          photo_url?: string | null
+          member_number?: number
           status?: Database["public"]["Enums"]["signup_status"]
           admin_note?: string | null
           created_at?: string
@@ -124,6 +128,8 @@ export type Database = {
           location?: string
           location_other?: string | null
           verification_doc_url?: string
+          photo_url?: string | null
+          member_number?: number
           status?: Database["public"]["Enums"]["signup_status"]
           admin_note?: string | null
           created_at?: string

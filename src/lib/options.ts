@@ -55,6 +55,18 @@ export type BusinessCategory = (typeof BUSINESS_CATEGORIES)[number];
 
 export const OTHER_VALUE = "Other";
 
+/** Membership number as it appears on the card: 10001 -> "RPP-10001". */
+export function memberId(n: number | null | undefined): string {
+  if (!n) return "RPP-—";
+  return `RPP-${String(n).padStart(5, "0")}`;
+}
+
+/** Cards show "Ahmed E." — full first name, surname initial only. */
+export function cardName(first: string, surname: string): string {
+  const initial = surname?.trim()?.[0];
+  return initial ? `${first} ${initial.toUpperCase()}.` : first;
+}
+
 /**
  * Resolves the user-facing label for a driver type, falling back to a custom value if "Other".
  */

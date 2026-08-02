@@ -4,8 +4,20 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Building2, Clock, CheckCircle2, CreditCard, Eye, Loader2, Plus } from "lucide-react";
+import { Building2, Clock, CheckCircle2, CreditCard, Eye, Loader2, Plus, Trash2 } from "lucide-react";
 import { displayBusinessCategory } from "@/lib/options";
+import { adminDeleteBusiness } from "@/integrations/supabase/partner-actions";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import {
   BusinessStatusBadge,
@@ -79,12 +91,85 @@ export default function AdminBusinesses() {
         </TabButton>
       </div>
 
-      <BusinessTable rows={rows === null ? null : tab === "applications" ? applications : partners} />
+      <BusinessTable
+        rows={rows === null ? null : tab === "applications" ? applications : partners}
+        onDeleted={(id) => setRows((prev) => prev?.filter((r) => r.id !== id) ?? null)}
+      />
     </div>
   );
 }
 
-function BusinessTable({ rows }: { rows: Business[] | null }) {
+function DeleteBusiness({
+  business,
+  onDeleted,
+}: {
+  business: Business;
+  onDeleted: (id: string) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  const confirm = async () => {
+    setBusy(true);
+    const res = await adminDeleteBusiness(business.id);
+    setBusy(false);
+    if (!res.ok) {
+      // Keep the dialog open so the reason stays on screen.
+      toast.error(res.error);
+      return;
+    }
+    setOpen(false);
+    onDeleted(business.id);
+    toast.success(`${business.name} deleted`);
+  };
+
+  return (
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialogTrigger asChild>
+        <Button
+          size="sm"
+          variant="outline_glow"
+          className="text-destructive hover:text-destructive"
+          aria-label={`Delete ${business.name}`}
+        >
+          <Trash2 className="size-3.5" />
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete {business.name}?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This permanently removes the business and every offer attached to it. It
+            can&apos;t be undone. Nothing is cancelled at Stripe — do that separately if
+            they ever paid.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={(e) => {
+              // Handle the async result ourselves rather than letting Radix close first.
+              e.preventDefault();
+              void confirm();
+            }}
+            disabled={busy}
+            className="bg-destructive text-white hover:bg-destructive/90"
+          >
+            {busy ? <><Loader2 className="size-4 animate-spin" /> Deleting…</> : "Delete"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+function BusinessTable({
+  rows,
+  onDeleted,
+}: {
+  rows: Business[] | null;
+  onDeleted: (id: string) => void;
+}) {
   return (
     <div className="glass-strong rounded-2xl overflow-hidden">
       {rows === null ? (
@@ -125,11 +210,14 @@ function BusinessTable({ rows }: { rows: Business[] | null }) {
                     {new Date(r.created_at).toLocaleDateString()}
                   </td>
                   <td className="px-6 py-4">
-                    <Button asChild size="sm" variant="outline_glow">
-                      <Link href={`/admin/businesses/${r.id}`}>
-                        <Eye className="size-3.5" /> View
-                      </Link>
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button asChild size="sm" variant="outline_glow">
+                        <Link href={`/admin/businesses/${r.id}`}>
+                          <Eye className="size-3.5" /> View
+                        </Link>
+                      </Button>
+                      <DeleteBusiness business={r} onDeleted={onDeleted} />
+                    </div>
                   </td>
                 </tr>
               ))}

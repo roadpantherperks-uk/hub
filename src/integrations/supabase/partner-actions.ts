@@ -177,6 +177,40 @@ export async function adminCreateBusiness(
   return { ok: true, data: { business_id: data.id } };
 }
 
+/**
+ * Permanently delete a business. Cascades to its perks, relationships and
+ * business_users rows via the FK constraints.
+ *
+ * Refuses while the subscription is live: deleting the row here does NOT cancel
+ * anything at Stripe, so the customer would carry on being charged with nothing
+ * in the admin to show for it. Cancel in Stripe first (which fires
+ * customer.subscription.deleted and flips billing_status), then delete.
+ */
+export async function adminDeleteBusiness(businessId: string): Promise<ActionResult> {
+  if (!(await hasRole("admin"))) return { ok: false, error: "Not authorized" };
+  const sb = adminClient();
+
+  const { data: biz, error: readErr } = await sb
+    .from("businesses")
+    .select("id, name, billing_status")
+    .eq("id", businessId)
+    .maybeSingle();
+  if (readErr) return { ok: false, error: readErr.message };
+  if (!biz) return { ok: false, error: "That business no longer exists" };
+
+  if (biz.billing_status === "active") {
+    return {
+      ok: false,
+      error:
+        "This partner has a live subscription. Cancel it in Stripe first, or you'll keep charging them after the record is gone.",
+    };
+  }
+
+  const { error } = await sb.from("businesses").delete().eq("id", businessId);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
 /* ------------------------------------------------------------------ public: pay */
 
 /**

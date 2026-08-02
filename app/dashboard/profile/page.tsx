@@ -1,10 +1,14 @@
 import { redirect } from "next/navigation";
 import { getSessionUser, getSupabaseServerClient } from "@/integrations/supabase/server";
 import { ProfileForm } from "./ProfileForm";
+import { PhotoUpload } from "@/components/dashboard/PhotoUpload";
 
 export const metadata = {
   title: "Profile",
 };
+
+// Signed photo URLs are short-lived, so don't cache this page.
+export const dynamic = "force-dynamic";
 
 export default async function ProfilePage() {
   const user = await getSessionUser();
@@ -14,7 +18,7 @@ export default async function ProfilePage() {
   const { data: driver } = await sb
     .from("drivers")
     .select(
-      "first_name, surname, email, phone, driver_type, driver_type_other, location, location_other",
+      "first_name, surname, email, phone, driver_type, driver_type_other, location, location_other, photo_url",
     )
     .eq("id", user.id)
     .maybeSingle();
@@ -28,6 +32,14 @@ export default async function ProfilePage() {
         </p>
       </div>
     );
+  }
+
+  let photoSignedUrl: string | null = null;
+  if (driver.photo_url) {
+    const { data: signed } = await sb.storage
+      .from("member-photos")
+      .createSignedUrl(driver.photo_url, 60 * 30);
+    photoSignedUrl = signed?.signedUrl ?? null;
   }
 
   return (
@@ -45,7 +57,14 @@ export default async function ProfilePage() {
         </p>
       </div>
 
-      <ProfileForm initial={driver} />
+      <div className="space-y-8">
+        <PhotoUpload
+          userId={user.id}
+          initialPath={driver.photo_url}
+          initialSignedUrl={photoSignedUrl}
+        />
+        <ProfileForm initial={driver} />
+      </div>
     </div>
   );
 }

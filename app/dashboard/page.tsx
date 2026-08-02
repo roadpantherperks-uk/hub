@@ -1,7 +1,8 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser, getSupabaseServerClient } from "@/integrations/supabase/server";
 import { StatusBadge, type SignupStatus } from "@/components/StatusBadge";
-import { Clock, ShieldCheck, Sparkles, XCircle } from "lucide-react";
+import { Clock, ShieldCheck, Sparkles, XCircle, CreditCard } from "lucide-react";
 
 export const metadata = {
   title: "Dashboard",
@@ -70,10 +71,16 @@ export default async function DashboardHome() {
           <ShieldCheck className="size-6 text-brand mb-4" strokeWidth={1.5} />
           <h2 className="text-xl font-semibold tracking-tight">You&apos;re verified.</h2>
           <p className="text-muted-foreground mt-3 leading-relaxed text-[15px]">
-            Welcome to the network. The offers feed opens at launch — we&apos;ll
-            email you the moment exclusive deals go live.
+            Welcome to the network. Show your member card at a partner business to claim
+            an offer — we&apos;ll email you as new partners come on board.
           </p>
-          <div className="mt-6 inline-flex items-center gap-2 text-xs text-muted-foreground">
+          <Link
+            href="/dashboard/card"
+            className="mt-6 inline-flex items-center gap-2 h-11 px-5 rounded-full bg-foreground text-background text-sm font-semibold hover:bg-foreground/90 transition-colors"
+          >
+            <CreditCard className="size-4" /> View my member card
+          </Link>
+          <div className="mt-6 flex items-center gap-2 text-xs text-muted-foreground">
             <Sparkles className="size-3.5 text-brand" />
             Member since {new Date(driver.created_at).toLocaleDateString("en-GB")}
           </div>
